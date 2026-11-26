@@ -92,6 +92,7 @@ class RunOut(BaseModel):
     trigger: str
     games_collected: int
     failed_platforms: str | None
+    error_message: str | None
 
 
 # ---------- Addresses ----------
@@ -134,5 +135,5 @@ def list_runs(limit: int = Query(20, ge=1, le=200), db: Session = Depends(get_db
     return [RunOut(id=r.id, started_at=r.started_at.isoformat(),
                    finished_at=r.finished_at.isoformat() if r.finished_at else None,
                    status=r.status, trigger=r.trigger, games_collected=r.games_collected,
-                   failed_platforms=r.failed_platforms)
+                   failed_platforms=r.failed_platforms, error_message=r.error_message)
             for r in repo.recent_runs(db, limit)]

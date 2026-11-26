@@ -37,3 +37,22 @@ def test_devices_fit():
 def test_platform_and_status_fit():
     assert max(len(p) for p in ["appstore", "playstore", "roblox"]) <= max_len(Game.platform)
     assert max(len(s) for s in ["running", "success", "partial", "failed"]) <= max_len(CollectionRun.status)
+
+
+def test_android_package_names_fit():
+    # Android allows package names up to 255 characters
+    assert max_len(Game.platform_game_id) >= 255
+
+
+def test_run_errors_are_short_and_readable():
+    from app.cli import short_error
+
+    class FakeDbError(Exception):
+        pass
+
+    cause = FakeDbError("value too long for type character varying(64)\n[SQL: INSERT ... 50 rows of data ...]")
+    wrapper = Exception("wrapper with huge text " * 500)
+    wrapper.orig = cause
+    message = short_error(wrapper)
+    assert message == "FakeDbError: value too long for type character varying(64)"
+    assert len(short_error(Exception("x" * 5000))) <= 500

@@ -63,6 +63,14 @@ def run_collectors(only_platform: str | None = None) -> tuple[list[GameRank], li
     return results, failed
 
 
+def short_error(exc: Exception) -> str:
+    """A short, readable error for run history: the error TYPE + first line only.
+    (Database errors can be huge because they include all the data that failed.)"""
+    original = getattr(exc, "orig", None) or exc   # for database errors, use the real cause
+    first_line = (str(original).strip().splitlines() or [""])[0]
+    return f"{type(original).__name__}: {first_line}"[:500]
+
+
 def today_local() -> date:
     """Today's date in the app time zone (IST), not the server's time zone (UTC on EC2)."""
     return datetime.now(ZoneInfo(get_settings().app.timezone)).date()
@@ -79,8 +87,11 @@ def collect_and_save(only_platform: str | None = None, trigger: str = "manual") 
         with session_scope() as session:
             saved = repo.save_rankings(session, results, ranking_date=today_local(), run_id=run_id)
     except Exception as exc:
+        # Always save the error TYPE too: some errors have an empty message
+        error = short_error(exc)
+        log.exception("Run %s failed while collecting or saving", run_id)
         with session_scope() as session:
-            repo.finish_run(session, session.get(CollectionRun, run_id), 0, [], error=str(exc))
+            repo.finish_run(session, session.get(CollectionRun, run_id), 0, [], error=error)
         raise
 
     # 2. Mark the run as success / partial / failed

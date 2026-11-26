@@ -33,7 +33,9 @@ class Game(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     platform: Mapped[str] = mapped_column(String(32))
-    platform_game_id: Mapped[str] = mapped_column(String(64))   # Apple's / Roblox's own ID
+    # The store's own ID: Apple number, Roblox universe id, or Android package name
+    # (package names can be up to 255 characters, e.g. com.some.company.very.long.game.name)
+    platform_game_id: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(255))
     developer: Mapped[str | None] = mapped_column(String(255))
     genre: Mapped[str | None] = mapped_column(String(64))
