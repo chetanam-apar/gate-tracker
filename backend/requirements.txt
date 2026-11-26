@@ -5,3 +5,5 @@ python-dotenv==1.1.1   # reads .env file
 SQLAlchemy==2.0.58     # talks to the database using Python instead of raw SQL
 alembic==1.20.1        # database "migrations" = version control for tables
 psycopg[binary]==3.3.9 # the driver that connects Python to PostgreSQL
+fastapi==0.165.0       # builds the web API (the addresses the website calls)
+uvicorn[standard]==0.54.0  # the server that runs the API

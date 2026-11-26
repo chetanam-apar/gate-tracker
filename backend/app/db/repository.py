@@ -121,6 +121,9 @@ class ChartRow:
     genre: str | None
     change: int | None      # +3 = moved up 3 places, -2 = down 2, None = new entry
     player_count: int | None
+    game_id: int = 0
+    icon_url: str | None = None
+    store_url: str | None = None
 
 
 def latest_date(session: Session, platform: str, chart: str, country: str, device: str = "all",
@@ -163,7 +166,8 @@ def get_chart(session: Session, platform: str, chart: str, country: str, *, devi
         old = previous.get(rk.game_id)
         rows.append(ChartRow(rank=rk.rank, name=game.name, developer=game.developer, genre=game.genre,
                              change=(old - rk.rank) if old is not None else None,
-                             player_count=rk.player_count))
+                             player_count=rk.player_count, game_id=game.id,
+                             icon_url=game.icon_url, store_url=game.store_url))
     return day, rows
 
 
