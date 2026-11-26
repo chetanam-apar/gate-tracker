@@ -44,7 +44,9 @@ class DefaultsSection(BaseModel):
 
 class PlatformSection(BaseModel):
     enabled: bool = False
-    charts: list[str] = []
+    charts: list[str] | str = []     # a list of chart names, or "all"
+    devices: list[str] = []          # Roblox only
+    country: str | None = None       # override defaults.country for this platform
 
 
 class HttpSection(BaseModel):

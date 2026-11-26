@@ -62,6 +62,7 @@ def _upsert_games(session: Session, platform: str, ranks: list[GameRank]) -> dic
         # Names and icons can change over time, keep the latest
         game.name = r.name
         game.developer = r.developer
+        game.genre = r.genre or game.genre
         game.icon_url = r.icon_url
         game.store_url = r.store_url
         game.last_seen_at = r.collected_at
@@ -77,12 +78,12 @@ def save_rankings(session: Session, ranks: list[GameRank], ranking_date: date, r
     snapshot is REPLACED with the new one (delete + insert inside one
     transaction). So running 'collect' 3 times a day is safe.
     """
-    groups: dict[tuple[str, str, str], list[GameRank]] = defaultdict(list)
+    groups: dict[tuple[str, str, str, str], list[GameRank]] = defaultdict(list)
     for r in ranks:
-        groups[(r.platform, r.chart, r.country)].append(r)
+        groups[(r.platform, r.chart, r.country, r.device)].append(r)
 
     saved = 0
-    for (platform, chart, country), group in groups.items():
+    for (platform, chart, country, device), group in groups.items():
         games = _upsert_games(session, platform, group)
 
         platform_game_ids = select(Game.id).where(Game.platform == platform)
@@ -90,6 +91,7 @@ def save_rankings(session: Session, ranks: list[GameRank], ranking_date: date, r
             delete(Ranking).where(
                 Ranking.chart == chart,
                 Ranking.country == country,
+                Ranking.device == device,
                 Ranking.ranking_date == ranking_date,
                 Ranking.game_id.in_(platform_game_ids),
             )
@@ -101,7 +103,7 @@ def save_rankings(session: Session, ranks: list[GameRank], ranking_date: date, r
                 continue
             seen.add(game.id)
             session.add(Ranking(
-                game_id=game.id, run_id=run_id, chart=chart, country=country, rank=r.rank,
+                game_id=game.id, run_id=run_id, chart=chart, country=country, device=device, rank=r.rank,
                 player_count=r.player_count, ranking_date=ranking_date, collected_at=r.collected_at,
             ))
             saved += 1
@@ -116,48 +118,76 @@ class ChartRow:
     rank: int
     name: str
     developer: str | None
+    genre: str | None
     change: int | None      # +3 = moved up 3 places, -2 = down 2, None = new entry
     player_count: int | None
 
 
-def latest_date(session: Session, platform: str, chart: str, country: str, before: date | None = None) -> date | None:
+def latest_date(session: Session, platform: str, chart: str, country: str, device: str = "all",
+                before: date | None = None) -> date | None:
     query = (
         select(func.max(Ranking.ranking_date))
         .join(Game)
-        .where(Game.platform == platform, Ranking.chart == chart, Ranking.country == country)
+        .where(Game.platform == platform, Ranking.chart == chart, Ranking.country == country,
+               Ranking.device == device)
     )
     if before:
         query = query.where(Ranking.ranking_date < before)
     return session.scalar(query)
 
 
-def _ranks_on(session: Session, platform: str, chart: str, country: str, day: date) -> list[tuple[Ranking, Game]]:
+def _ranks_on(session: Session, platform: str, chart: str, country: str, device: str,
+              day: date) -> list[tuple[Ranking, Game]]:
     return list(session.execute(
         select(Ranking, Game).join(Game)
-        .where(Game.platform == platform, Ranking.chart == chart,
-               Ranking.country == country, Ranking.ranking_date == day)
+        .where(Game.platform == platform, Ranking.chart == chart, Ranking.country == country,
+               Ranking.device == device, Ranking.ranking_date == day)
         .order_by(Ranking.rank)
     ).tuples())
 
 
-def get_chart(session: Session, platform: str, chart: str, country: str,
+def get_chart(session: Session, platform: str, chart: str, country: str, *, device: str = "all",
               day: date | None = None) -> tuple[date | None, list[ChartRow]]:
     """A chart for one day, with rank change compared to the previous saved day."""
-    day = day or latest_date(session, platform, chart, country)
+    day = day or latest_date(session, platform, chart, country, device)
     if day is None:
         return None, []
-    previous_day = latest_date(session, platform, chart, country, before=day)
+    previous_day = latest_date(session, platform, chart, country, device, before=day)
     previous = {}
     if previous_day:
-        previous = {rk.game_id: rk.rank for rk, _ in _ranks_on(session, platform, chart, country, previous_day)}
+        previous = {rk.game_id: rk.rank
+                    for rk, _ in _ranks_on(session, platform, chart, country, device, previous_day)}
 
     rows = []
-    for rk, game in _ranks_on(session, platform, chart, country, day):
+    for rk, game in _ranks_on(session, platform, chart, country, device, day):
         old = previous.get(rk.game_id)
-        rows.append(ChartRow(rank=rk.rank, name=game.name, developer=game.developer,
+        rows.append(ChartRow(rank=rk.rank, name=game.name, developer=game.developer, genre=game.genre,
                              change=(old - rk.rank) if old is not None else None,
                              player_count=rk.player_count))
     return day, rows
+
+
+@dataclass
+class ChartInfo:
+    platform: str
+    chart: str
+    country: str
+    device: str
+    games: int
+
+
+def list_charts(session: Session, day: date | None = None) -> tuple[date | None, list[ChartInfo]]:
+    """Every chart saved on a day (default: the latest day with any data)."""
+    day = day or session.scalar(select(func.max(Ranking.ranking_date)))
+    if day is None:
+        return None, []
+    rows = session.execute(
+        select(Game.platform, Ranking.chart, Ranking.country, Ranking.device, func.count())
+        .join(Game).where(Ranking.ranking_date == day)
+        .group_by(Game.platform, Ranking.chart, Ranking.country, Ranking.device)
+        .order_by(Game.platform, Ranking.device, Ranking.chart)
+    ).all()
+    return day, [ChartInfo(*row) for row in rows]
 
 
 def recent_runs(session: Session, limit: int = 10) -> list[CollectionRun]:

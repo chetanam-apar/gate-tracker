@@ -1,0 +1,49 @@
+[
+  {
+    "header": {"sorts": null, "layoutData": {}},
+    "sorts": [
+      {
+        "contentType": "Filters",
+        "sortId": "filters_v5",
+        "sortDisplayName": "",
+        "filters": [{"filterId": "device_filter_v1", "selectedOptionId": "computer"}]
+      },
+      {
+        "contentType": "Games",
+        "sortId": "top-trending",
+        "sortDisplayName": "Top Trending",
+        "appliedFilters": "device=computer,age=all,country=in",
+        "games": [
+          {"universeId": 10773618503, "rootPlaceId": 101277003916102, "name": "Hyper Realistic Ragdoll", "playerCount": 46568, "isSponsored": false, "genreL1": "Simulation"},
+          {"universeId": 999, "rootPlaceId": 111, "name": "Some Ad Game", "playerCount": 10, "isSponsored": true, "genreL1": "Action"},
+          {"universeId": 10773416193, "rootPlaceId": 78884249003161, "name": "Voxel Wars", "playerCount": 18212, "isSponsored": false, "genreL1": "Shooter"},
+          {"universeId": 10773618503, "rootPlaceId": 101277003916102, "name": "Hyper Realistic Ragdoll", "playerCount": 46568, "isSponsored": false, "genreL1": "Simulation"},
+          {"universeId": 10771159260, "rootPlaceId": 115175190808402, "name": "Krillion 🦐 [UNLIMITED] ", "playerCount": 8943, "isSponsored": false, "genreL1": "Entertainment"}
+        ]
+      }
+    ],
+    "nextSortsPageToken": "page2"
+  },
+  {
+    "header": {"sorts": null, "layoutData": {}},
+    "sorts": [
+      {
+        "contentType": "Games",
+        "sortId": "top-playing-now",
+        "sortDisplayName": "Top Playing Now",
+        "games": [
+          {"universeId": 1, "rootPlaceId": 11, "name": "Steal An Egg", "playerCount": 548047, "isSponsored": false, "genreL1": "Simulation"},
+          {"universeId": 2, "rootPlaceId": 22, "name": "Blox Fruits", "playerCount": 185817, "isSponsored": false, "genreL1": "RPG"},
+          {"name": "Broken game with no id"}
+        ]
+      },
+      {
+        "contentType": "Songs",
+        "sortId": "music-top-100",
+        "sortDisplayName": "Music Top 100",
+        "games": []
+      }
+    ],
+    "nextSortsPageToken": ""
+  }
+]

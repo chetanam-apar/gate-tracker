@@ -3,8 +3,8 @@
 Tracks the **top 50 games in India** on the App Store, Play Store and Roblox, every night at 12 AM.
 It saves each day's data so we can see trends over time, and shows it on a dashboard.
 
-> **Status:** Step 2 of 8 done. App Store collector + PostgreSQL database with daily history.
-> Next: Play Store and Roblox collectors, scheduler, dashboard.
+> **Status:** Step 3a done. App Store + Roblox collectors, PostgreSQL database with daily history.
+> Next: Play Store collector, 12 AM scheduler, dashboard.
 
 ---
 
@@ -40,7 +40,7 @@ shape (`GameRank`), so the rest of the app doesn't care where the data came from
 | Table | One row = |
 |---|---|
 | `games` | one game on one platform (name, developer, icon). Stored once. |
-| `rankings` | one game's rank in one chart on one day. This is the history. |
+| `rankings` | one game's rank in one chart, on one device, on one day. This is the history. |
 | `collection_runs` | one run of the job: when, success or fail, how many saved |
 
 **No duplicates:** running `collect` many times on the same day replaces that day's chart, it doesn't add copies.
@@ -67,7 +67,9 @@ alembic upgrade head              # create the tables
 |---|---|
 | Fetch all enabled platforms and save | `python -m app.cli collect` |
 | Fetch only, don't save | `python -m app.cli collect --dry-run` |
+| List every chart saved today | `python -m app.cli charts` |
 | Show saved chart with rank changes | `python -m app.cli show --chart top_free` |
+| Show a Roblox chart (phone) | `python -m app.cli show --platform roblox --chart top_trending --device high_end_phone` |
 | Show a chart for a past day | `python -m app.cli show --chart top_paid --date 2026-11-26` |
 | History of runs (did it work?) | `python -m app.cli runs` |
 | Run tests | `python -m pytest` |
@@ -92,6 +94,8 @@ Open `config.yaml` in any text editor:
 - **Change country:** `country: "in"` → `"us"` for USA
 - **Save top 100 instead of 50:** `top_n: 50` → `top_n: 100`
 - **Turn a platform off:** `enabled: true` → `enabled: false`
+- **Roblox: only some lists:** `charts: all` → `charts: [top_trending, top_playing_now]` (names from `python -m app.cli charts`)
+- **Roblox: change devices:** edit the `devices:` list (`high_end_phone`, `computer`, `console`...)
 
 If you type something wrong, the app stops and tells you exactly which line is wrong.
 
@@ -101,7 +105,8 @@ If you type something wrong, the app stops and tells you exactly which line is w
 |---|---|
 | `Can't reach the database. Is Docker running?` | Open Docker Desktop, then `docker compose up -d` |
 | `DATABASE_URL is missing` | Copy the database lines from `.env.example` into `.env` |
-| `relation "games" does not exist` | Run `alembic upgrade head` from `backend/` |
+| `Tables are missing` / `column ... does not exist` | Run `alembic upgrade head` from `backend/` (needed after every update that adds a migration) |
+| `password authentication failed` | Password in `DATABASE_URL` must match the one the database was created with |
 
 ## Data sources
 
@@ -109,4 +114,6 @@ If you type something wrong, the app stops and tells you exactly which line is w
 |---|---|---|
 | App Store | Apple public RSS feed (official, free, no key) | Rank in Top Free / Paid / Grossing |
 | Play Store | Step 3 | Rank |
-| Roblox | Step 3 | Live player count |
+| Roblox | Same API as roblox.com/charts (works without login, but not officially documented) | ~26 lists (Trending, Top Playing Now, Top Earning, genres...) with live player counts, per device |
+
+Note: Roblox "Top Playing Now" is the same worldwide. "Top Trending" and others change by country and device.

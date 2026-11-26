@@ -27,7 +27,13 @@ platforms:
     enabled: false             # coming in Step 3
 
   roblox:
-    enabled: false             # coming in Step 3
+    enabled: true
+    charts: all                # "all" = every list on roblox.com/charts
+                               # or pick some, e.g.:  charts: [top_trending, top_playing_now, top_earning]
+    devices:                   # Roblox charts are different per device
+      - high_end_phone         # phones (most players in India)
+      - computer
+      # other options: low_end_phone, high_end_tablet, low_end_tablet, console, vr
 
 http:
   timeout_seconds: 20          # wait this long for a platform to answer

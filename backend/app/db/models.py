@@ -36,6 +36,7 @@ class Game(Base):
     platform_game_id: Mapped[str] = mapped_column(String(64))   # Apple's / Roblox's own ID
     name: Mapped[str] = mapped_column(String(255))
     developer: Mapped[str | None] = mapped_column(String(255))
+    genre: Mapped[str | None] = mapped_column(String(64))
     icon_url: Mapped[str | None] = mapped_column(Text)
     store_url: Mapped[str | None] = mapped_column(Text)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -60,17 +61,18 @@ class CollectionRun(Base):
 class Ranking(Base):
     __tablename__ = "rankings"
     __table_args__ = (
-        # NO DUPLICATES: one game has only one rank per chart per country per day
-        UniqueConstraint("game_id", "chart", "country", "ranking_date", name="uq_rankings_game_chart_day"),
+        # NO DUPLICATES: one game has only one rank per chart, country, device and day
+        UniqueConstraint("game_id", "chart", "country", "device", "ranking_date", name="uq_rankings_game_chart_day"),
         # Index = like a book's index. Makes "show me today's chart" fast even with years of data
-        Index("ix_rankings_chart_day", "chart", "country", "ranking_date"),
+        Index("ix_rankings_chart_day", "chart", "country", "device", "ranking_date"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
     run_id: Mapped[int | None] = mapped_column(ForeignKey("collection_runs.id", ondelete="SET NULL"))
-    chart: Mapped[str] = mapped_column(String(32))
+    chart: Mapped[str] = mapped_column(String(64))   # Roblox names can be long: trending_in_roleplay_and_avatar_sim
     country: Mapped[str] = mapped_column(String(2))
+    device: Mapped[str] = mapped_column(String(32), default="all", server_default="all")
     rank: Mapped[int] = mapped_column(Integer)
     player_count: Mapped[int | None] = mapped_column(Integer)
     ranking_date: Mapped[date] = mapped_column(Date)   # the day in IST

@@ -53,7 +53,7 @@ def test_rerun_replaces_todays_snapshot(engine):
     with session_scope(engine) as s:
         repo.save_rankings(s, [make(1, "b"), make(2, "a"), make(3, "d")], DAY1)
     with session_scope(engine) as s:
-        _, rows = repo.get_chart(s, "appstore", "top_free", "in", DAY1)
+        _, rows = repo.get_chart(s, "appstore", "top_free", "in", day=DAY1)
     assert [r.name for r in rows] == ["Game b", "Game a", "Game d"]
 
 
@@ -82,6 +82,19 @@ def test_same_chart_name_on_two_platforms_does_not_clash(engine):
         repo.save_rankings(s, [make(1, "x", platform="appstore")], DAY1)
         repo.save_rankings(s, [make(1, "x", platform="playstore")], DAY1)
     assert count(engine, Ranking) == 2  # saving Play Store didn't delete App Store's top_free
+
+
+def test_same_chart_on_two_devices_kept_separately(engine):
+    phone = make(1, "x", chart="top_trending", platform="roblox").model_copy(update={"device": "high_end_phone"})
+    pc = make(1, "x", chart="top_trending", platform="roblox").model_copy(update={"device": "computer"})
+    with session_scope(engine) as s:
+        repo.save_rankings(s, [phone, pc], DAY1)
+        repo.save_rankings(s, [pc], DAY1)  # re-saving computer must not delete phone
+    with session_scope(engine) as s:
+        _, phone_rows = repo.get_chart(s, "roblox", "top_trending", "in", device="high_end_phone")
+        _, charts = repo.list_charts(s)
+    assert len(phone_rows) == 1
+    assert {c.device for c in charts} == {"high_end_phone", "computer"}
 
 
 def test_run_status(engine):

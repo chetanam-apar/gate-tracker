@@ -30,12 +30,14 @@ class GameRank(BaseModel):
     """One game's position in one chart, at one moment in time."""
 
     platform: str               # "appstore", "playstore", "roblox"
-    chart: str                  # "top_free", "top_grossing", "most_played" ...
+    chart: str                  # "top_free", "top_grossing", "top_trending" ...
     country: str                # "in"
+    device: str = "all"         # Roblox charts differ per device ("computer", "high_end_phone")
     rank: int                   # 1 = top
     game_id: str                # the platform's own ID for this game
     name: str
     developer: str | None = None
+    genre: str | None = None          # e.g. "Action" (Roblox gives this)
     icon_url: str | None = None
     store_url: str | None = None
     player_count: int | None = None   # only platforms that share it (Roblox)
