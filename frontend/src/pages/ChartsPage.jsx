@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
-import { DEVICE_NAMES, PLATFORM_NAMES, chartName, formatNumber } from "../labels.js";
+import { DEVICE_NAMES, PLATFORM_NAMES, chartName, formatDay, formatNumber } from "../labels.js";
 import ChartTable from "../components/ChartTable.jsx";
 import StatCard from "../components/StatCard.jsx";
 
@@ -10,6 +10,8 @@ export default function ChartsPage() {
   const [platform, setPlatform] = useState("appstore");
   const [chart, setChart] = useState("top_free");
   const [device, setDevice] = useState("all");
+  const [dates, setDates] = useState([]);   // days that have data for this chart, newest first
+  const [date, setDate] = useState("");     // "" = latest
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -46,16 +48,23 @@ export default function ChartsPage() {
     if (!options[platform]?.[next]?.includes(device)) setDevice(pickDevice(options[platform]?.[next]));
   }
 
-  // 2. Load the chosen chart whenever the choice changes
+  // 2. When platform / chart / device changes: load the list of dates, go back to the latest day
+  useEffect(() => {
+    if (!available || !chart) return;
+    setDate("");
+    api.chartDates(platform, chart, device).then(setDates).catch(() => setDates([]));
+  }, [available, platform, chart, device]);
+
+  // 3. Load the chosen chart whenever any choice changes (including the date)
   useEffect(() => {
     if (!available || !chart) return;
     setLoading(true);
     setError(null);
-    api.chart(platform, chart, device)
+    api.chart(platform, chart, device, date)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [available, platform, chart, device]);
+  }, [available, platform, chart, device, date]);
 
   if (error && !available) return <ErrorBox message={error} />;
   if (!available) return <p className="muted">Loading…</p>;
@@ -86,18 +95,24 @@ export default function ChartsPage() {
               {devices.map((d) => <option key={d} value={d}>{DEVICE_NAMES[d] || d}</option>)}
             </select>
           )}
+          <select value={date} onChange={(e) => setDate(e.target.value)} title="Only days with saved data are listed">
+            {dates.map((d, i) => (
+              <option key={d} value={i === 0 ? "" : d}>{i === 0 ? `Latest (${formatDay(d)})` : formatDay(d)}</option>
+            ))}
+          </select>
         </div>
       </div>
 
       <div className="stats">
-        <StatCard label="Date" value={data?.date || "-"} />
+        <StatCard label="Date" value={data?.date ? formatDay(data.date) : "-"}
+                  note={dates.length ? `${dates.length} day${dates.length > 1 ? "s" : ""} of history` : ""} />
         <StatCard
           label="Biggest climber"
           value={climber ? climber.name : "-"}
           note={climber ? `up ${climber.change} places` : "needs 2 days of data"}
           tone={climber ? "up" : ""}
         />
-        <StatCard label="New in this chart" value={newCount} note="compared to previous day" />
+        <StatCard label="New in this chart" value={newCount} note="compared to the day before" />
         {isRoblox && rows[0] && (
           <StatCard label="Most players (#1)" value={formatNumber(rows[0].player_count)} note={rows[0].name} />
         )}

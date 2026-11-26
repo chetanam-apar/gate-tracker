@@ -196,3 +196,40 @@ def list_charts(session: Session, day: date | None = None) -> tuple[date | None,
 
 def recent_runs(session: Session, limit: int = 10) -> list[CollectionRun]:
     return list(session.scalars(select(CollectionRun).order_by(CollectionRun.id.desc()).limit(limit)))
+
+
+# ---------- History ----------
+
+def available_dates(session: Session, platform: str, chart: str, country: str, device: str = "all") -> list[date]:
+    """Every day this chart has data, newest first. Used by the date dropdown."""
+    return list(session.scalars(
+        select(Ranking.ranking_date).distinct().join(Game)
+        .where(Game.platform == platform, Ranking.chart == chart, Ranking.country == country,
+               Ranking.device == device)
+        .order_by(Ranking.ranking_date.desc())
+    ))
+
+
+@dataclass
+class GenrePoint:
+    day: date
+    genre: str
+    players: int     # total live players of all games of this genre in the chart
+    games: int       # how many games of this genre are in the chart
+
+
+def genre_trend(session: Session, platform: str, chart: str, country: str, device: str,
+                since: date | None = None) -> list[GenrePoint]:
+    """Per day and per genre: total players and number of games. For the genre graph."""
+    genre = func.coalesce(Game.genre, "Unknown")
+    query = (
+        select(Ranking.ranking_date, genre, func.coalesce(func.sum(Ranking.player_count), 0), func.count())
+        .join(Game)
+        .where(Game.platform == platform, Ranking.chart == chart, Ranking.country == country,
+               Ranking.device == device)
+        .group_by(Ranking.ranking_date, genre)
+        .order_by(Ranking.ranking_date)
+    )
+    if since:
+        query = query.where(Ranking.ranking_date >= since)
+    return [GenrePoint(day=d, genre=g, players=int(p), games=n) for d, g, p, n in session.execute(query)]

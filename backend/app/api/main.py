@@ -15,7 +15,7 @@ How a request works:
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -127,6 +127,58 @@ def get_chart(platform: str, chart: str,
         raise HTTPException(404, f"No data for {platform}/{chart}/{country}/{device}. See /api/charts")
     return ChartOut(platform=platform, chart=chart, country=country, device=device, date=found_day,
                     rows=[ChartRowOut(**vars(r)) for r in rows[:limit]])
+
+
+@app.get("/api/charts/{platform}/{chart}/dates", response_model=list[date], tags=["charts"])
+def chart_dates(platform: str, chart: str,
+                device: str | None = Query(None, description="Roblox: computer / high_end_phone"),
+                country: str | None = Query(None, description="Default: from config.yaml"),
+                db: Session = Depends(get_db)):
+    """Every day this chart has data, newest first (for the date picker)."""
+    country = country or get_settings().defaults.country
+    device = device or ("computer" if platform == "roblox" else "all")
+    return repo.available_dates(db, platform, chart, country, device)
+
+
+class GenreSeries(BaseModel):
+    genre: str
+    players: list[int]      # one number per date, same order as "dates"
+    games: list[int]
+
+
+class GenreTrend(BaseModel):
+    chart: str
+    device: str
+    country: str
+    dates: list[date]
+    genres: list[GenreSeries]   # sorted: most players on the latest day first
+
+
+@app.get("/api/roblox/genres", response_model=GenreTrend, tags=["trends"])
+def roblox_genres(chart: str = Query("top_playing_now"),
+                  device: str = Query("high_end_phone"),
+                  country: str | None = Query(None, description="Default: from config.yaml"),
+                  days: int = Query(30, ge=1, le=365, description="How many days back"),
+                  db: Session = Depends(get_db)):
+    """Roblox players per genre per day, for the genre graph."""
+    country = country or get_settings().defaults.country
+    latest = repo.latest_date(db, "roblox", chart, country, device)
+    if latest is None:
+        raise HTTPException(404, f"No Roblox data for {chart}/{country}/{device}")
+    points = repo.genre_trend(db, "roblox", chart, country, device, since=latest - timedelta(days=days - 1))
+
+    dates = sorted({p.day for p in points})
+    by_genre: dict[str, dict[date, repo.GenrePoint]] = {}
+    for p in points:
+        by_genre.setdefault(p.genre, {})[p.day] = p
+    series = [
+        GenreSeries(genre=g,
+                    players=[by_day[d].players if d in by_day else 0 for d in dates],
+                    games=[by_day[d].games if d in by_day else 0 for d in dates])
+        for g, by_day in by_genre.items()
+    ]
+    series.sort(key=lambda s: s.players[-1], reverse=True)
+    return GenreTrend(chart=chart, device=device, country=country, dates=dates, genres=series)
 
 
 @app.get("/api/runs", response_model=list[RunOut], tags=["system"])

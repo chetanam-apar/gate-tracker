@@ -25,6 +25,7 @@ src/
 ├── styles.css          all styling
 ├── pages/
 │   ├── ChartsPage.jsx  pick platform / chart / device, see the table
+│   ├── GenresPage.jsx  Roblox genre trends (line graph)
 │   └── RunsPage.jsx    run history
 └── components/
     ├── ChartTable.jsx  the games table

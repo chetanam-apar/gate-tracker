@@ -71,3 +71,52 @@ def test_unknown_chart_is_404(client):
 def test_runs(client):
     runs = client.get("/api/runs").json()
     assert runs[0]["status"] == "success" and runs[0]["games_collected"] == 5
+
+
+def roblox(r, gid, genre, players, chart="top_playing_now", device="high_end_phone"):
+    return GameRank(platform="roblox", chart=chart, country="in", device=device, rank=r, game_id=gid,
+                    name=f"Game {gid}", genre=genre, player_count=players, collected_at=NOW)
+
+
+@pytest.fixture
+def history_client():
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(engine)
+    with session_scope(engine) as s:
+        repo.save_rankings(s, [roblox(1, "a", "Simulation", 500), roblox(2, "b", "RPG", 300),
+                               roblox(3, "c", "Simulation", 100)], date(2026, 11, 24))
+        repo.save_rankings(s, [roblox(1, "b", "RPG", 900), roblox(2, "a", "Simulation", 400)], date(2026, 11, 26))
+        repo.save_rankings(s, [rank(1, "x")], date(2026, 11, 26))
+
+    def test_db():
+        with session_scope(engine) as s:
+            yield s
+
+    app.dependency_overrides[get_db] = test_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+def test_dates_newest_first_and_only_days_with_data(history_client):
+    dates = history_client.get("/api/charts/roblox/top_playing_now/dates?device=high_end_phone").json()
+    assert dates == ["2026-11-26", "2026-11-24"]   # 25th had no data (e.g. a failed night), so it's not offered
+
+
+def test_past_date_chart(history_client):
+    data = history_client.get("/api/charts/roblox/top_playing_now?device=high_end_phone&date=2026-11-24").json()
+    assert data["date"] == "2026-11-24"
+    assert [r["name"] for r in data["rows"]] == ["Game a", "Game b", "Game c"]
+
+
+def test_genre_trend_totals_per_day(history_client):
+    data = history_client.get("/api/roblox/genres?chart=top_playing_now&device=high_end_phone").json()
+    assert data["dates"] == ["2026-11-24", "2026-11-26"]
+    by_genre = {g["genre"]: g for g in data["genres"]}
+    assert by_genre["Simulation"]["players"] == [600, 400]   # 500 + 100, then 400
+    assert by_genre["Simulation"]["games"] == [2, 1]
+    assert by_genre["RPG"]["players"] == [300, 900]
+    assert data["genres"][0]["genre"] == "RPG"              # most players on the latest day first
+
+
+def test_genre_trend_404_when_no_data(history_client):
+    assert history_client.get("/api/roblox/genres?chart=nope").status_code == 404

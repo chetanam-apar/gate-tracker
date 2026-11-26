@@ -29,7 +29,7 @@ a:hover { text-decoration: underline; }
   display: block; width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 4px;
   border: none; border-radius: 8px; background: none; font-size: 14px; color: var(--muted); cursor: pointer;
 }
-.nav-item:hover { background: var(--bg); }
+.nav-item:hover { background: var(--bg); text-decoration: none; }
 .nav-item.active { background: var(--bg); color: var(--text); font-weight: 500; }
 
 .content { padding: 24px 32px; max-width: 1100px; }
@@ -51,7 +51,7 @@ select { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
 .chart-table tr:last-child td { border-bottom: none; }
 .col-rank { width: 44px; }
 .col-change { width: 80px; }
-.col-num { text-align: right; }
+.col-num, .chart-table th.col-num { text-align: right; }
 
 .game { display: flex; align-items: center; gap: 10px; }
 .icon { width: 32px; height: 32px; border-radius: 8px; background: var(--bg); flex-shrink: 0; object-fit: cover; }
@@ -69,3 +69,8 @@ select { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
 
 .error-box { background: #fdecec; color: var(--down); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
 .problem { max-width: 360px; font-size: 12px; word-break: break-word; }
+.hint { margin: -8px 0 16px; font-size: 13px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+.chart-card { padding: 16px 8px 8px; margin-bottom: 24px; }
+.section-title { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+.info-box { background: #e8eefc; color: #1f3f8a; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 14px; }
