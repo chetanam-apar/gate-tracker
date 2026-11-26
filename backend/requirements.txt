@@ -2,3 +2,6 @@ httpx==0.28.1          # makes API calls (HTTP requests)
 pydantic==2.11.7       # checks data has the right shape and types
 PyYAML==6.0.2          # reads config.yaml
 python-dotenv==1.1.1   # reads .env file
+SQLAlchemy==2.0.58     # talks to the database using Python instead of raw SQL
+alembic==1.20.1        # database "migrations" = version control for tables
+psycopg[binary]==3.3.9 # the driver that connects Python to PostgreSQL

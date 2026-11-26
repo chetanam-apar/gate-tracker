@@ -3,7 +3,8 @@
 Tracks the **top 50 games in India** on the App Store, Play Store and Roblox, every night at 12 AM.
 It saves each day's data so we can see trends over time, and shows it on a dashboard.
 
-> **Status:** Step 1 of 8 done. The App Store collector works. Database, scheduler and dashboard are coming next.
+> **Status:** Step 2 of 8 done. App Store collector + PostgreSQL database with daily history.
+> Next: Play Store and Roblox collectors, scheduler, dashboard.
 
 ---
 
@@ -13,11 +14,14 @@ It saves each day's data so we can see trends over time, and shows it on a dashb
 game-tracker/
 ├── config.yaml          ← SETTINGS. Change country, top N, platforms here. No coding needed.
 ├── .env.example         ← template for secrets. Copy it to .env
+├── docker-compose.yml   ← starts the database (later: the whole app)
 ├── backend/
 │   ├── app/
 │   │   ├── core/        ← shared tools: settings loader, logs, HTTP client with retries
 │   │   ├── collectors/  ← one file per platform. Each one fetches data and converts it
-│   │   └── cli.py       ← the command you run
+│   │   ├── db/          ← database tables (models.py) and all reads/writes (repository.py)
+│   │   └── cli.py       ← the commands you run
+│   ├── migrations/      ← version history of the database tables (Alembic)
 │   └── tests/           ← automatic checks with saved sample data
 └── frontend/            ← dashboard (Step 6)
 ```
@@ -25,36 +29,59 @@ game-tracker/
 ## How data flows
 
 ```
-config.yaml → cli.py → each collector → platform API → convert to GameRank → print / save
+config.yaml → cli.py → each collector → platform API → GameRank → database
 ```
 
 Every platform returns data in a different shape. Each collector converts it into the same
 shape (`GameRank`), so the rest of the app doesn't care where the data came from.
 
+## Database tables
+
+| Table | One row = |
+|---|---|
+| `games` | one game on one platform (name, developer, icon). Stored once. |
+| `rankings` | one game's rank in one chart on one day. This is the history. |
+| `collection_runs` | one run of the job: when, success or fail, how many saved |
+
+**No duplicates:** running `collect` many times on the same day replaces that day's chart, it doesn't add copies.
+
 ---
 
 ## Run it on your computer (first time)
 
-Open Terminal in the project folder, then:
+Needs: Python 3.11+, Docker Desktop (open and running).
 
 ```bash
-cp .env.example .env              # make your own settings file for secrets
+cp .env.example .env              # your own secrets file. Change the password in BOTH places
+docker compose up -d              # start the database in the background
 cd backend
 python3 -m venv .venv             # create a private Python space for this project
 source .venv/bin/activate         # turn it on (you'll see (.venv) in the terminal)
 pip install -r requirements-dev.txt
+alembic upgrade head              # create the tables
 ```
 
-## Everyday commands (from the `backend/` folder, with `.venv` active)
+## Everyday commands (from `backend/`, with `.venv` active)
 
 | What | Command |
 |---|---|
-| Fetch all enabled platforms | `python -m app.cli collect` |
-| Fetch only App Store | `python -m app.cli collect --platform appstore` |
-| Fetch and save to `data/` as JSON | `python -m app.cli collect --save` |
+| Fetch all enabled platforms and save | `python -m app.cli collect` |
+| Fetch only, don't save | `python -m app.cli collect --dry-run` |
+| Show saved chart with rank changes | `python -m app.cli show --chart top_free` |
+| Show a chart for a past day | `python -m app.cli show --chart top_paid --date 2026-11-26` |
+| History of runs (did it work?) | `python -m app.cli runs` |
 | Run tests | `python -m pytest` |
 
-Next time you only need `cd backend` and `source .venv/bin/activate`.
+Next time you only need: Docker Desktop open, `cd backend`, `source .venv/bin/activate`.
+
+## Database commands (from the project folder)
+
+| What | Command |
+|---|---|
+| Start database | `docker compose up -d` |
+| Stop database (data is kept) | `docker compose down` |
+| Is it running? | `docker compose ps` |
+| Open the database console | `docker exec -it gametracker-db psql -U gametracker` |
 
 ---
 
@@ -67,6 +94,14 @@ Open `config.yaml` in any text editor:
 - **Turn a platform off:** `enabled: true` → `enabled: false`
 
 If you type something wrong, the app stops and tells you exactly which line is wrong.
+
+## Common problems
+
+| You see | Fix |
+|---|---|
+| `Can't reach the database. Is Docker running?` | Open Docker Desktop, then `docker compose up -d` |
+| `DATABASE_URL is missing` | Copy the database lines from `.env.example` into `.env` |
+| `relation "games" does not exist` | Run `alembic upgrade head` from `backend/` |
 
 ## Data sources
 

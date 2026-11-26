@@ -1,0 +1,164 @@
+"""
+All reading and writing of the database happens here (the "repository").
+
+Why one file? The rest of the app never writes SQL or touches tables
+directly. If we ever change the database, only this file changes.
+"""
+from __future__ import annotations
+
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
+
+from sqlalchemy import delete, func, select
+from sqlalchemy.orm import Session
+
+from app.collectors.base import GameRank
+from app.db.models import CollectionRun, Game, Ranking
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# ---------- Run history ----------
+
+def start_run(session: Session, trigger: str = "manual") -> CollectionRun:
+    run = CollectionRun(started_at=_now(), status="running", trigger=trigger)
+    session.add(run)
+    session.flush()  # flush = send to DB now so run.id gets a number
+    return run
+
+
+def finish_run(session: Session, run: CollectionRun, games_collected: int,
+               failed_platforms: list[str], error: str | None = None) -> None:
+    run.finished_at = _now()
+    run.games_collected = games_collected
+    run.failed_platforms = ",".join(failed_platforms) or None
+    run.error_message = error
+    if error or (failed_platforms and games_collected == 0):
+        run.status = "failed"
+    elif failed_platforms:
+        run.status = "partial"   # some platforms worked, some didn't
+    else:
+        run.status = "success"
+
+
+# ---------- Saving rankings ----------
+
+def _upsert_games(session: Session, platform: str, ranks: list[GameRank]) -> dict[str, Game]:
+    """Insert new games, update name/icon of games we've seen before. Returns {platform_game_id: Game}."""
+    ids = [r.game_id for r in ranks]
+    existing = {
+        g.platform_game_id: g
+        for g in session.scalars(select(Game).where(Game.platform == platform, Game.platform_game_id.in_(ids)))
+    }
+    for r in ranks:
+        game = existing.get(r.game_id)
+        if game is None:
+            game = Game(platform=platform, platform_game_id=r.game_id, first_seen_at=r.collected_at)
+            session.add(game)
+            existing[r.game_id] = game
+        # Names and icons can change over time, keep the latest
+        game.name = r.name
+        game.developer = r.developer
+        game.icon_url = r.icon_url
+        game.store_url = r.store_url
+        game.last_seen_at = r.collected_at
+    session.flush()
+    return existing
+
+
+def save_rankings(session: Session, ranks: list[GameRank], ranking_date: date, run_id: int | None = None) -> int:
+    """
+    Save a list of GameRank for one day.
+
+    No-duplicates rule: if this chart was already saved today, today's
+    snapshot is REPLACED with the new one (delete + insert inside one
+    transaction). So running 'collect' 3 times a day is safe.
+    """
+    groups: dict[tuple[str, str, str], list[GameRank]] = defaultdict(list)
+    for r in ranks:
+        groups[(r.platform, r.chart, r.country)].append(r)
+
+    saved = 0
+    for (platform, chart, country), group in groups.items():
+        games = _upsert_games(session, platform, group)
+
+        platform_game_ids = select(Game.id).where(Game.platform == platform)
+        session.execute(
+            delete(Ranking).where(
+                Ranking.chart == chart,
+                Ranking.country == country,
+                Ranking.ranking_date == ranking_date,
+                Ranking.game_id.in_(platform_game_ids),
+            )
+        )
+        seen: set[int] = set()
+        for r in group:
+            game = games[r.game_id]
+            if game.id in seen:   # same game twice in one chart (rare API glitch): keep the best rank
+                continue
+            seen.add(game.id)
+            session.add(Ranking(
+                game_id=game.id, run_id=run_id, chart=chart, country=country, rank=r.rank,
+                player_count=r.player_count, ranking_date=ranking_date, collected_at=r.collected_at,
+            ))
+            saved += 1
+    session.flush()
+    return saved
+
+
+# ---------- Reading ----------
+
+@dataclass
+class ChartRow:
+    rank: int
+    name: str
+    developer: str | None
+    change: int | None      # +3 = moved up 3 places, -2 = down 2, None = new entry
+    player_count: int | None
+
+
+def latest_date(session: Session, platform: str, chart: str, country: str, before: date | None = None) -> date | None:
+    query = (
+        select(func.max(Ranking.ranking_date))
+        .join(Game)
+        .where(Game.platform == platform, Ranking.chart == chart, Ranking.country == country)
+    )
+    if before:
+        query = query.where(Ranking.ranking_date < before)
+    return session.scalar(query)
+
+
+def _ranks_on(session: Session, platform: str, chart: str, country: str, day: date) -> list[tuple[Ranking, Game]]:
+    return list(session.execute(
+        select(Ranking, Game).join(Game)
+        .where(Game.platform == platform, Ranking.chart == chart,
+               Ranking.country == country, Ranking.ranking_date == day)
+        .order_by(Ranking.rank)
+    ).tuples())
+
+
+def get_chart(session: Session, platform: str, chart: str, country: str,
+              day: date | None = None) -> tuple[date | None, list[ChartRow]]:
+    """A chart for one day, with rank change compared to the previous saved day."""
+    day = day or latest_date(session, platform, chart, country)
+    if day is None:
+        return None, []
+    previous_day = latest_date(session, platform, chart, country, before=day)
+    previous = {}
+    if previous_day:
+        previous = {rk.game_id: rk.rank for rk, _ in _ranks_on(session, platform, chart, country, previous_day)}
+
+    rows = []
+    for rk, game in _ranks_on(session, platform, chart, country, day):
+        old = previous.get(rk.game_id)
+        rows.append(ChartRow(rank=rk.rank, name=game.name, developer=game.developer,
+                             change=(old - rk.rank) if old is not None else None,
+                             player_count=rk.player_count))
+    return day, rows
+
+
+def recent_runs(session: Session, limit: int = 10) -> list[CollectionRun]:
+    return list(session.scalars(select(CollectionRun).order_by(CollectionRun.id.desc()).limit(limit)))
