@@ -1,0 +1,4 @@
+httpx==0.28.1          # makes API calls (HTTP requests)
+pydantic==2.11.7       # checks data has the right shape and types
+PyYAML==6.0.2          # reads config.yaml
+python-dotenv==1.1.1   # reads .env file

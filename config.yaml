@@ -1,0 +1,34 @@
+# =====================================================
+#  GAME TRACKER - SETTINGS
+#  You can change these values without touching code.
+#  Lines starting with # are notes, the app ignores them.
+# =====================================================
+
+app:
+  name: "Game Tracker"
+  timezone: "Asia/Kolkata"     # all times below use this time zone (IST)
+
+schedule:
+  daily_run_time: "00:00"      # 24-hour format. "00:00" = 12 AM midnight (used from Step 4)
+
+defaults:
+  country: "in"                # 2-letter country code: in = India, us = USA
+  top_n: 50                    # how many games to save per chart (max 200)
+
+platforms:
+  appstore:
+    enabled: true              # true = fetch this platform, false = skip it
+    charts:                    # which App Store charts to fetch (remove a line to skip it)
+      - top_free
+      - top_paid
+      - top_grossing
+
+  playstore:
+    enabled: false             # coming in Step 3
+
+  roblox:
+    enabled: false             # coming in Step 3
+
+http:
+  timeout_seconds: 20          # wait this long for a platform to answer
+  max_retries: 3               # try again this many times if a request fails
