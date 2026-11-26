@@ -3,8 +3,8 @@
 Tracks the **top 50 games in India** on the App Store, Play Store and Roblox, every night at 12 AM.
 It saves each day's data so we can see trends over time, and shows it on a dashboard.
 
-> **Status:** Step 3a done. App Store + Roblox collectors, PostgreSQL database with daily history.
-> Next: Play Store collector, 12 AM scheduler, dashboard.
+> **Status:** Step 3 done. App Store + Play Store + Roblox collectors, PostgreSQL database with daily history.
+> Next: 12 AM scheduler (Step 4), backend API (Step 5), dashboard (Step 6).
 
 ---
 
@@ -113,7 +113,7 @@ If you type something wrong, the app stops and tells you exactly which line is w
 | Platform | Source | Gives |
 |---|---|---|
 | App Store | Apple public RSS feed (official, free, no key) | Rank in Top Free / Paid / Grossing |
-| Play Store | Step 3 | Rank |
+| Play Store | Copies the Play Store website's own internal request (same method as the open-source google-play-scraper). No login. **Unofficial, can break if Google changes it.** | Rank in Top Free / Paid / Grossing games |
 | Roblox | Same API as roblox.com/charts (works without login, but not officially documented) | ~26 lists (Trending, Top Playing Now, Top Earning, genres...) with live player counts, per device |
 
 Note: Roblox "Top Playing Now" is the same worldwide. "Top Trending" and others change by country and device.

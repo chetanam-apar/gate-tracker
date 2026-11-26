@@ -34,17 +34,25 @@ class HttpClient:
 
     def get_json(self, url: str, params: dict | None = None) -> dict | list:
         """GET a URL and return the JSON body. Retries on temporary errors."""
+        return self._request("GET", url, params=params).json()
+
+    def post_form(self, url: str, data: dict, params: dict | None = None) -> str:
+        """POST a form (like a website does) and return the raw text body. Retries on temporary errors."""
+        return self._request("POST", url, params=params, data=data).text
+
+    def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """One place for timeout + retry logic, used by every GET and POST."""
         attempt = 0
         while True:
             attempt += 1
             try:
-                response = self._client.get(url, params=params)
+                response = self._client.request(method, url, **kwargs)
                 if response.status_code in RETRY_STATUS_CODES:
                     raise httpx.HTTPStatusError(
                         f"temporary error {response.status_code}", request=response.request, response=response
                     )
                 response.raise_for_status()  # 4xx errors (our mistake) fail right away
-                return response.json()
+                return response
             except (httpx.TransportError, httpx.HTTPStatusError) as exc:
                 is_temporary = isinstance(exc, httpx.TransportError) or (
                     exc.response.status_code in RETRY_STATUS_CODES

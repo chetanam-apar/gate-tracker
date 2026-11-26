@@ -8,10 +8,11 @@ from __future__ import annotations
 
 from app.collectors.appstore import AppStoreCollector
 from app.collectors.base import BaseCollector
+from app.collectors.playstore import PlayStoreCollector
 from app.collectors.roblox import RobloxCollector
 
 COLLECTORS: dict[str, type[BaseCollector]] = {
     "appstore": AppStoreCollector,
-    # "playstore": PlayStoreCollector,   # Step 3
+    "playstore": PlayStoreCollector,
     "roblox": RobloxCollector,
 }

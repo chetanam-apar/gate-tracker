@@ -24,7 +24,11 @@ platforms:
       - top_grossing
 
   playstore:
-    enabled: false             # coming in Step 3
+    enabled: true              # unofficial: copies what the Play Store website does. May break if Google changes it.
+    charts:
+      - top_free
+      - top_paid
+      - top_grossing
 
   roblox:
     enabled: true
