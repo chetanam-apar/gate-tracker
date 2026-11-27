@@ -158,7 +158,7 @@ def cmd_collect(args) -> int:
         log.info("Dry run: %d games fetched, nothing saved to database", len(results))
         return 1 if failed else 0
 
-    saved, failed = collect_and_save(args.platform)
+    saved, failed = collect_and_save(args.platform, trigger=args.trigger)
     log.info("Done: %d rankings saved, %d platform(s) failed %s", saved, len(failed), failed or "")
     log.info("See them with: python -m app.cli show --chart top_free")
     return 1 if failed else 0
@@ -221,6 +221,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--platform", choices=list(COLLECTORS), help="Only this platform")
     p.add_argument("--dry-run", action="store_true", help="Fetch and print only, don't save")
     p.add_argument("--save-json", action="store_true", help="With --dry-run: also save to data/*.json")
+    p.add_argument("--trigger", default="manual", choices=["manual", "scheduled"],
+                   help="Who started this run (shown in run history). The 12 AM job uses 'scheduled'")
     p.set_defaults(func=cmd_collect)
 
     p = sub.add_parser("show", help="Show a saved chart with rank changes")
@@ -235,6 +237,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("charts", help="List every chart saved on a day")
     p.add_argument("--date", help="YYYY-MM-DD. Default: latest")
     p.set_defaults(func=cmd_charts)
+
+    p = sub.add_parser("schedule-time", help="Print the daily run time from config.yaml (used by install_cron.sh)")
+    p.set_defaults(func=lambda args: print(get_settings().schedule.daily_run_time) or 0)
 
     p = sub.add_parser("runs", help="Show recent collection runs")
     p.add_argument("--limit", type=int, default=10)

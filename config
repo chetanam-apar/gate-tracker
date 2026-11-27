@@ -1,0 +1,6 @@
+Host gametracker
+        HostName 13.234.136.170
+        IdentityFile /Users/chetanamali/.ssh/id_ed25519
+        Port 22
+        User gametracker
+        TCPKeepAlive yes

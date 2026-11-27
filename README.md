@@ -15,11 +15,13 @@ game-tracker/
 ├── config.yaml          ← SETTINGS. Change country, top N, platforms here. No coding needed.
 ├── .env.example         ← template for secrets. Copy it to .env
 ├── docker-compose.yml   ← starts the database (later: the whole app)
+├── scripts/             ← collect.sh (the nightly job) + install/uninstall cron
 ├── backend/
 │   ├── app/
 │   │   ├── core/        ← shared tools: settings loader, logs, HTTP client with retries
 │   │   ├── collectors/  ← one file per platform. Each one fetches data and converts it
 │   │   ├── db/          ← database tables (models.py) and all reads/writes (repository.py)
+│   │   ├── api/         ← the web API the website calls (main.py)
 │   │   └── cli.py       ← the commands you run
 │   ├── migrations/      ← version history of the database tables (Alembic)
 │   └── tests/           ← automatic checks with saved sample data
@@ -75,6 +77,43 @@ alembic upgrade head              # create the tables
 | Run tests | `python -m pytest` |
 
 Next time you only need: Docker Desktop open, `cd backend`, `source .venv/bin/activate`.
+
+## The 12 AM job (automatic daily collection)
+
+Every night at the time in `config.yaml` (`daily_run_time`, default `"00:00"` = 12 AM), cron runs
+`scripts/collect.sh`, which runs `collect` and writes to `logs/collect_YYYY-MM.log`.
+
+| What | Command (from the project folder) |
+|---|---|
+| Turn it on (or update the time after changing config.yaml) | `./scripts/install_cron.sh` |
+| See it | `crontab -l` |
+| Turn it off | `./scripts/uninstall_cron.sh` |
+| Run it now by hand (same as cron) | `./scripts/collect.sh` |
+| Read the log | `tail -50 logs/collect_$(date +%Y-%m).log` |
+
+Did last night work? Check the **Run history** page (trigger = `scheduled`) or the log file.
+
+**On a Mac:** cron only runs if the Mac is **on and awake** at that time, and **Docker Desktop is running**.
+If it was asleep, that night is skipped (stores don't give past data). On EC2 the server is always on.
+
+## The API (Step 4)
+
+The website reads data through the API. Start it from `backend/` (with `.venv` active):
+
+```bash
+uvicorn app.api.main:app --reload
+```
+
+Then open **http://127.0.0.1:8000/docs** in your browser. You can try every address there.
+Stop it with `Ctrl + C`.
+
+| Address | Gives back |
+|---|---|
+| `/api/health` | `{"status": "ok"}` if the API and database work |
+| `/api/charts` | every chart saved on the latest day |
+| `/api/charts/appstore/top_grossing` | one chart, with rank change |
+| `/api/charts/roblox/top_trending?device=high_end_phone` | a Roblox chart for phones |
+| `/api/runs` | history of collection runs |
 
 ## Database commands (from the project folder)
 
